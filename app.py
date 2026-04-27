@@ -611,30 +611,30 @@ elif "Dashboard" in page:
     # ── SUBJECT TABLE ──
     st.markdown("<div class='section-header'>📋 Subject-wise Performance</div>", unsafe_allow_html=True)
     
-    # Display dataframe with styling
+    # Display dataframe with styling - compatible with all pandas versions
     display_df = df[['Subject', 'Credits', 'Internal (/50)', 'External (/100)', 
                      'Total %', 'Grade', 'Grade Point', 'Attendance %', 'Status']]
     
-    # Apply custom styling
-    def color_grade(val):
-        if val == 'S': return 'color: #fbbf24; font-weight: bold'
-        elif val == 'A': return 'color: #34d399; font-weight: bold'
-        elif val == 'B': return 'color: #60a5fa; font-weight: bold'
-        elif val == 'C': return 'color: #a78bfa; font-weight: bold'
-        elif val == 'D': return 'color: #fb923c; font-weight: bold'
-        elif val == 'E': return 'color: #f87171; font-weight: bold'
-        elif val == 'F': return 'color: #ef4444; font-weight: bold'
-        return ''
+    # Format numbers
+    display_df['Total %'] = display_df['Total %'].apply(lambda x: f"{x:.1f}%")
+    display_df['Attendance %'] = display_df['Attendance %'].apply(lambda x: f"{x:.1f}%")
     
-    def color_attendance(val):
-        if val < 75:
-            return 'color: #ef4444; font-weight: bold'
-        return 'color: #34d399'
+    # Simple clean display without complex styling (won't crash)
+    st.dataframe(display_df, use_container_width=True, height=400)
     
-    styled_df = display_df.style.applymap(color_grade, subset=['Grade'])
-    styled_df = styled_df.applymap(color_attendance, subset=['Attendance %'])
-    
-    st.dataframe(styled_df, use_container_width=True, height=400)
+    # Visual legend for grades
+    st.markdown("""
+    <div style='font-size:.75rem;color:#94a3b8;padding:.5rem;text-align:center;background:#111827;border-radius:8px;margin-top:.5rem'>
+      🎨 Grade Guide: <span style='color:#fbbf24;font-weight:bold'>S</span> | 
+      <span style='color:#34d399;font-weight:bold'>A</span> | 
+      <span style='color:#60a5fa;font-weight:bold'>B</span> | 
+      <span style='color:#a78bfa;font-weight:bold'>C</span> | 
+      <span style='color:#fb923c;font-weight:bold'>D</span> | 
+      <span style='color:#f87171;font-weight:bold'>E</span> | 
+      <span style='color:#ef4444;font-weight:bold'>F</span>
+      &nbsp;&nbsp;| ⚠️ <span style='color:#ef4444'>Red attendance</span> = below 75%
+    </div>
+    """, unsafe_allow_html=True)
 
     # ── CHART SECTION ──
     st.markdown("<div class='section-header'>📈 Visual Analytics</div>", unsafe_allow_html=True)
