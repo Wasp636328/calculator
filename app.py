@@ -305,14 +305,14 @@ def get_grade(percentage: float) -> tuple:
 
 
 def calc_total_percentage(internal: float, external: float) -> float:
-    """Convert internal/50 + external/100 → aggregate percentage /100."""
-    total = (internal / 50) * 50 + external
-    return round((total / 150) * 100, 2)
+    """Convert internal/40 + external/100 → aggregate percentage /140."""
+    total = internal + external
+    return round((total / 140) * 100, 2)
 
 
 def marks_needed_for_grade(internal: float, target_threshold: float):
     """Return external marks needed to reach target_threshold% overall."""
-    needed = (target_threshold * 150 / 100) - internal
+    needed = (target_threshold * 140 / 100) - internal
     if needed <= 0:
         return 0.0
     if needed > 100:
@@ -344,7 +344,7 @@ def process_subjects(subjects: list) -> pd.DataFrame:
         rows.append({
             "Subject":        s["name"],
             "Credits":        s["credits"],
-            "Internal (/50)": s["internal"],
+            "Internal (/40)": s["internal"],
             "External (/100)": s["external"],
             "Total %":        pct,
             "Grade":          grade,
@@ -501,7 +501,7 @@ if "Enter" in page:
             c3, c4 = st.columns(2)
             with c3:
                 internal = st.number_input(
-                    "Internal /50", min_value=0.0, max_value=50.0, value=35.0,
+                    "Internal /40", min_value=0.0, max_value=40.0, value=28.0,
                     step=0.5, key=f"int_{i}", label_visibility="collapsed"
                 )
             with c4:
@@ -529,7 +529,7 @@ if "Enter" in page:
                     font-family:"JetBrains Mono",monospace;margin-bottom:.8rem;
                     padding-left:.2rem;letter-spacing:.05em;flex-wrap:wrap'>
           <span style='flex:3;min-width:100px'>SUBJECT NAME &nbsp;|&nbsp; CREDITS</span>
-          <span style='flex:2;min-width:100px'>INTERNAL /50 &nbsp;|&nbsp; EXTERNAL /100</span>
+          <span style='flex:2;min-width:100px'>INTERNAL /40 &nbsp;|&nbsp; EXTERNAL /100</span>
           <span style='flex:2;min-width:100px'>ATTENDED &nbsp;|&nbsp; TOTAL CLASSES</span>
         </div>
         """, unsafe_allow_html=True)
@@ -611,8 +611,8 @@ elif "Dashboard" in page:
     # ── SUBJECT TABLE - Mobile scrollable ──
     st.markdown("<div class='section-header'>📋 Subject-wise Performance</div>", unsafe_allow_html=True)
     
-    display_df = df[['Subject', 'Credits', 'Internal (/50)', 'External (/100)', 
-                     'Total %', 'Grade', 'Grade Point', 'Attendance %', 'Status']]
+    display_df = df[['Subject', 'Credits', 'Internal (/40)', 'External (/100)', 
+                 'Total %', 'Grade', 'Grade Point', 'Attendance %', 'Status']]
     
     # Format numbers
     display_df['Total %'] = display_df['Total %'].apply(lambda x: f"{x:.1f}%")
