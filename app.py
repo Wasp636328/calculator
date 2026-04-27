@@ -55,7 +55,7 @@ st.markdown("""
     background-color: var(--bg-deep);
     color: var(--text-hi);
   }
-  .block-container { padding: 2rem 2.5rem 4rem; max-width: 1400px; }
+  .block-container { padding: 1rem 1rem 4rem; max-width: 1400px; }
 
   /* ── Hide Streamlit chrome ── */
   #MainMenu, footer, header { visibility: hidden; }
@@ -65,8 +65,8 @@ st.markdown("""
     background: linear-gradient(135deg, #0d1b2e 0%, #162032 50%, #0b0f1a 100%);
     border: 1px solid var(--border);
     border-radius: 16px;
-    padding: 2.5rem 3rem;
-    margin-bottom: 2rem;
+    padding: 1.5rem 1.5rem;
+    margin-bottom: 1.5rem;
     position: relative;
     overflow: hidden;
   }
@@ -86,14 +86,14 @@ st.markdown("""
   }
   .hero-title {
     font-family: var(--font-head);
-    font-size: 2.8rem;
+    font-size: clamp(1.4rem, 5vw, 2.8rem);
     color: var(--text-hi);
     margin: 0 0 .4rem;
     line-height: 1.1;
   }
   .hero-title span { color: var(--accent); }
   .hero-subtitle {
-    font-size: 1.05rem;
+    font-size: clamp(.85rem, 2.5vw, 1.05rem);
     color: var(--text-mid);
     font-weight: 300;
     letter-spacing: .04em;
@@ -114,7 +114,7 @@ st.markdown("""
   /* ── Section headers ── */
   .section-header {
     font-family: var(--font-head);
-    font-size: 1.55rem;
+    font-size: clamp(1.1rem, 3vw, 1.55rem);
     color: var(--text-hi);
     border-left: 3px solid var(--accent);
     padding-left: .85rem;
@@ -153,10 +153,10 @@ st.markdown("""
     background: var(--bg-card);
     border: 1px solid var(--border);
     border-radius: 12px;
-    padding: 1.2rem 1.4rem;
+    padding: 1rem 1rem;
   }
   [data-testid="metric-container"] label { color: var(--text-mid) !important; font-size: .82rem; }
-  [data-testid="metric-container"] [data-testid="stMetricValue"] { color: var(--text-hi) !important; font-size: 2rem; font-weight: 700; }
+  [data-testid="metric-container"] [data-testid="stMetricValue"] { color: var(--text-hi) !important; font-size: clamp(1.2rem, 4vw, 2rem); font-weight: 700; }
 
   /* ── Buttons ── */
   .stButton > button {
@@ -256,6 +256,14 @@ st.markdown("""
     font-weight: 600;
     font-size: .9rem;
     margin-bottom: 1rem;
+    flex-wrap: wrap;
+  }
+
+  /* ── Mobile tweaks ── */
+  @media (max-width: 768px) {
+    .block-container { padding: .5rem .5rem 3rem; }
+    .hero { padding: 1.2rem 1rem; }
+    .card { padding: 1rem; }
   }
 </style>
 """, unsafe_allow_html=True)
@@ -289,7 +297,7 @@ PLOTLY_THEME = dict(
 # ─────────────────────────────────────────────
 # HELPER FUNCTIONS
 # ─────────────────────────────────────────────
-def get_grade(percentage: float) -> tuple[str, int]:
+def get_grade(percentage: float) -> tuple:
     for threshold, grade, gp in GRADE_SCALE:
         if percentage >= threshold:
             return grade, gp
@@ -302,15 +310,13 @@ def calc_total_percentage(internal: float, external: float) -> float:
     return round((total / 150) * 100, 2)
 
 
-def marks_needed_for_grade(internal: float, target_threshold: float) -> float | None:
+def marks_needed_for_grade(internal: float, target_threshold: float):
     """Return external marks needed to reach target_threshold% overall."""
-    # total% = ((internal/50)*50 + ext) / 150 * 100 >= target_threshold
-    # ext >= (target_threshold * 150 / 100) - internal
     needed = (target_threshold * 150 / 100) - internal
     if needed <= 0:
         return 0.0
     if needed > 100:
-        return None   # impossible
+        return None
     return round(needed, 1)
 
 
@@ -327,7 +333,7 @@ def build_required_marks(internal: float, current_pct: float) -> str:
     return "Already at maximum grade (S)."
 
 
-def process_subjects(subjects: list[dict]) -> pd.DataFrame:
+def process_subjects(subjects: list) -> pd.DataFrame:
     """Build results DataFrame from raw subject input dicts."""
     rows = []
     for s in subjects:
@@ -478,44 +484,67 @@ if "Enter" in page:
         st.markdown(f"<div class='subject-label'>▸ SUBJECT {i+1}</div>", unsafe_allow_html=True)
 
         with st.container():
-            c1, c2, c3, c4, c5, c6 = st.columns([2.5, 1, 1.2, 1.5, 1.5, 1.5])
+            # Row 1: Name + Credits  (mobile-friendly 2-col)
+            c1, c2 = st.columns([3, 1])
             with c1:
-                name = st.text_input("Subject Name", value=default_name, key=f"name_{i}", label_visibility="collapsed", placeholder="Subject Name")
+                name = st.text_input(
+                    "Subject Name", value=default_name, key=f"name_{i}",
+                    label_visibility="collapsed", placeholder="Subject Name"
+                )
             with c2:
-                credits = st.number_input("Credits", min_value=1, max_value=6, value=4, key=f"cred_{i}", label_visibility="collapsed")
+                credits = st.number_input(
+                    "Credits", min_value=1, max_value=6, value=4,
+                    key=f"cred_{i}", label_visibility="collapsed"
+                )
+
+            # Row 2: Internal + External
+            c3, c4 = st.columns(2)
             with c3:
-                internal = st.number_input("Internal /50", min_value=0.0, max_value=50.0, value=35.0, step=0.5, key=f"int_{i}", label_visibility="collapsed")
+                internal = st.number_input(
+                    "Internal /50", min_value=0.0, max_value=50.0, value=35.0,
+                    step=0.5, key=f"int_{i}", label_visibility="collapsed"
+                )
             with c4:
-                external = st.number_input("External /100", min_value=0.0, max_value=100.0, value=60.0, step=0.5, key=f"ext_{i}", label_visibility="collapsed")
+                external = st.number_input(
+                    "External /100", min_value=0.0, max_value=100.0, value=60.0,
+                    step=0.5, key=f"ext_{i}", label_visibility="collapsed"
+                )
+
+            # Row 3: Attended + Total Classes
+            c5, c6 = st.columns(2)
             with c5:
-                attended = st.number_input("Classes Attended", min_value=0, max_value=300, value=55, key=f"att_{i}", label_visibility="collapsed")
+                attended = st.number_input(
+                    "Classes Attended", min_value=0, max_value=300, value=55,
+                    key=f"att_{i}", label_visibility="collapsed"
+                )
             with c6:
-                total_cls = st.number_input("Total Classes", min_value=1, max_value=300, value=72, key=f"tot_{i}", label_visibility="collapsed")
+                total_cls = st.number_input(
+                    "Total Classes", min_value=1, max_value=300, value=72,
+                    key=f"tot_{i}", label_visibility="collapsed"
+                )
+
+        # Field legend below each subject
+        st.markdown("""
+        <div style='display:flex;gap:.5rem;font-size:.68rem;color:#475569;
+                    font-family:"JetBrains Mono",monospace;margin-bottom:.8rem;
+                    padding-left:.2rem;letter-spacing:.05em;flex-wrap:wrap'>
+          <span style='flex:3;min-width:100px'>SUBJECT NAME &nbsp;|&nbsp; CREDITS</span>
+          <span style='flex:2;min-width:100px'>INTERNAL /50 &nbsp;|&nbsp; EXTERNAL /100</span>
+          <span style='flex:2;min-width:100px'>ATTENDED &nbsp;|&nbsp; TOTAL CLASSES</span>
+        </div>
+        """, unsafe_allow_html=True)
 
         subject_data.append({
             "name": name, "credits": credits, "internal": internal,
             "external": external, "attended": attended, "total_classes": total_cls,
         })
 
-    # Column headers legend
-    st.markdown("""
-    <div style='display:flex;gap:1rem;font-size:.72rem;color:#475569;font-family:"JetBrains Mono",monospace;
-                margin-top:.2rem;padding-left:.2rem;letter-spacing:.06em'>
-      <span style='flex:2.5'>SUBJECT NAME</span>
-      <span style='flex:1'>CREDITS</span>
-      <span style='flex:1.2'>INTERNAL /50</span>
-      <span style='flex:1.5'>EXTERNAL /100</span>
-      <span style='flex:1.5'>ATTENDED</span>
-      <span style='flex:1.5'>TOTAL CLASSES</span>
-    </div>
-    """, unsafe_allow_html=True)
-
     st.markdown("<br>", unsafe_allow_html=True)
 
     # ── CALCULATE BUTTON ──
     if st.button("⚡ Calculate Performance", use_container_width=True):
         with st.spinner("Processing academic data..."):
-            import time; time.sleep(0.6)  # brief UX delay
+            import time; time.sleep(0.6)
             df = process_subjects(subject_data)
             st.session_state.results = df
             st.success("✅ Calculation complete! Switch to **📊 Dashboard** to see results.")
@@ -549,9 +578,11 @@ elif "Dashboard" in page:
 
     st.markdown("<div class='section-header'>📊 Performance Overview</div>", unsafe_allow_html=True)
 
-    k1, k2, k3, k4 = st.columns(4)
+    # 2×2 grid — works on both mobile and desktop
+    k1, k2 = st.columns(2)
+    k3, k4 = st.columns(2)
     k1.metric("🎓 CGPA", f"{cgpa}", delta=f"{'Good' if cgpa>=7 else 'Needs Work'}")
-    k2.metric("📅 Overall Attendance", f"{att_pct}%", delta=f"{'Above 75%' if att_pct>=75 else 'Below 75%'}")
+    k2.metric("📅 Attendance", f"{att_pct}%", delta=f"{'Above 75%' if att_pct>=75 else 'Below 75%'}")
     k3.metric("📚 Total Credits", total_cred)
     k4.metric("✅ Pass / ❌ Fail", f"{passed} / {failed}")
 
@@ -582,11 +613,15 @@ elif "Dashboard" in page:
         "Total %", "Grade", "Grade Point", "Attendance %", "Status", "Required Marks"
     ]].copy()
 
+    # FIX: use .map() instead of deprecated .applymap()
     st.dataframe(
         display_df.style
             .background_gradient(subset=["Total %"], cmap="Blues")
             .background_gradient(subset=["Attendance %"], cmap="Greens")
-            .applymap(lambda v: f"color: {GRADE_COLORS.get(v, '#f1f5f9')}; font-weight:700" if v in GRADE_COLORS else "", subset=["Grade"])
+            .map(
+                lambda v: f"color: {GRADE_COLORS.get(v, '#f1f5f9')}; font-weight:700" if v in GRADE_COLORS else "",
+                subset=["Grade"]
+            )
             .set_properties(**{"background-color": "#111827", "color": "#f1f5f9"}),
         use_container_width=True,
         height=300,
@@ -595,7 +630,7 @@ elif "Dashboard" in page:
     # ── CHARTS ──
     st.markdown("<div class='section-header'>📈 Visual Analytics</div>", unsafe_allow_html=True)
 
-    ch1, ch2 = st.columns(2)
+    ch1, ch2 = st.columns([1, 1])
 
     # Bar — subject marks
     with ch1:
@@ -625,7 +660,7 @@ elif "Dashboard" in page:
         fig_pie.update_traces(textinfo="percent+label", textfont_size=13)
         st.plotly_chart(fig_pie, use_container_width=True)
 
-    # Attendance line/bar
+    # Attendance bar
     fig_att = px.bar(
         df, x="Subject", y="Attendance %",
         color="Attendance %",
