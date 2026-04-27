@@ -557,9 +557,9 @@ elif "Dashboard" in page:
 
     if st.session_state.results is None:
         st.markdown("""
-        <div class='card' style='text-align:center;padding:3rem'>
-          <div style='font-size:3rem'>📊</div>
-          <div style='font-size:1.2rem;color:#94a3b8;margin-top:.8rem'>No data yet</div>
+        <div class='card' style='text-align:center;padding:2rem'>
+          <div style='font-size:2rem'>📊</div>
+          <div style='font-size:1rem;color:#94a3b8;margin-top:.8rem'>No data yet</div>
           <div style='color:#475569;margin-top:.4rem'>Go to <b>📝 Enter Marks</b> and click <b>Calculate</b>.</div>
         </div>
         """, unsafe_allow_html=True)
@@ -567,7 +567,7 @@ elif "Dashboard" in page:
 
     df = st.session_state.results
 
-    # ── KPI METRICS ──
+    # ── KPI METRICS - Mobile friendly layout ──
     cgpa        = calc_cgpa(df)
     att_pct     = calc_overall_attendance(df)
     total_cred  = df["Credits"].sum()
@@ -575,6 +575,125 @@ elif "Dashboard" in page:
     failed      = int((df["Grade"] == "F").sum())
     top_subject = df.loc[df["Total %"].idxmax(), "Subject"]
     top_score   = df["Total %"].max()
+
+    st.markdown("<div class='section-header'>📊 Performance Overview</div>", unsafe_allow_html=True)
+
+    # Use 2 rows with 2 columns each for mobile
+    col1, col2 = st.columns(2)
+    with col1:
+        st.metric("🎓 CGPA", f"{cgpa}", delta=f"{'Good' if cgpa>=7 else 'Needs Work'}")
+    with col2:
+        st.metric("📅 Attendance", f"{att_pct}%", delta=f"{'Above 75%' if att_pct>=75 else 'Below 75%'}")
+    
+    col3, col4 = st.columns(2)
+    with col3:
+        st.metric("📚 Total Credits", total_cred)
+    with col4:
+        st.metric("✅ Pass/❌ Fail", f"{passed}/{failed}")
+
+    # ── ALERTS ──
+    low_att = df[df["Attendance %"] < 75]
+    failed_subs = df[df["Grade"] == "F"]
+
+    if not low_att.empty:
+        for _, row in low_att.iterrows():
+            st.warning(f"⚠️ **{row['Subject']}** — Attendance {row['Attendance %']}% (below 75%)")
+
+    if not failed_subs.empty:
+        for _, row in failed_subs.iterrows():
+            st.error(f"❌ **{row['Subject']}** — Failed (Grade {row['Grade']})")
+
+    # ── BEST PERFORMER ──
+    st.markdown("<div class='section-header'>🏆 Best Performer</div>", unsafe_allow_html=True)
+    best = df.loc[df['Total %'].idxmax()]
+    st.success(f"🌟 **{best['Subject']}** – {best['Total %']:.1f}% (Grade {best['Grade']})")
+
+    # ── SUBJECT TABLE - Mobile scrollable ──
+    st.markdown("<div class='section-header'>📋 Subject-wise Performance</div>", unsafe_allow_html=True)
+    
+    display_df = df[['Subject', 'Credits', 'Internal (/50)', 'External (/100)', 
+                     'Total %', 'Grade', 'Grade Point', 'Attendance %', 'Status']]
+    
+    # Format numbers
+    display_df['Total %'] = display_df['Total %'].apply(lambda x: f"{x:.1f}%")
+    display_df['Attendance %'] = display_df['Attendance %'].apply(lambda x: f"{x:.1f}%")
+    
+    # Make dataframe scrollable on mobile
+    st.dataframe(display_df, use_container_width=True, height=400)
+    
+    # ── CHARTS - Stack vertically on mobile ──
+    st.markdown("<div class='section-header'>📈 Visual Analytics</div>", unsafe_allow_html=True)
+    
+    # Create tabs for better mobile experience
+    tab1, tab2, tab3 = st.tabs(["📊 Performance", "📉 Attendance", "🥧 Grade Distribution"])
+    
+    with tab1:
+        fig_bar = px.bar(
+            df, x='Subject', y='Total %',
+            color='Grade',
+            title='Performance by Subject (%)',
+            text='Total %',
+            height=400
+        )
+        fig_bar.update_traces(textposition='outside')
+        fig_bar.update_layout(
+            paper_bgcolor='rgba(0,0,0,0)',
+            plot_bgcolor='rgba(17,24,39,0.6)',
+            font=dict(color="#94a3b8"),
+            xaxis_tickangle=-45 if len(df) > 4 else 0
+        )
+        st.plotly_chart(fig_bar, use_container_width=True)
+    
+    with tab2:
+        # Attendance by subject bar chart
+        fig_att = px.bar(
+            df, x='Subject', y='Attendance %',
+            color='Attendance %',
+            color_continuous_scale=['#ef4444', '#f59e0b', '#34d399'],
+            title='Attendance by Subject (%)',
+            text='Attendance %',
+            height=400
+        )
+        fig_att.update_traces(textposition='outside')
+        fig_att.update_layout(
+            paper_bgcolor='rgba(0,0,0,0)',
+            plot_bgcolor='rgba(17,24,39,0.6)',
+            font=dict(color="#94a3b8"),
+            xaxis_tickangle=-45 if len(df) > 4 else 0
+        )
+        fig_att.add_hline(y=75, line_dash="dash", line_color="#f59e0b", annotation_text="75% minimum")
+        st.plotly_chart(fig_att, use_container_width=True)
+    
+    with tab3:
+        grade_dist = df['Grade'].value_counts().reset_index()
+        grade_dist.columns = ['Grade', 'Count']
+        fig_pie = px.pie(
+            grade_dist, values='Count', names='Grade',
+            title='Grade Distribution',
+            color='Grade',
+            hole=0.3,
+            height=400
+        )
+        fig_pie.update_layout(
+            paper_bgcolor='rgba(0,0,0,0)',
+            plot_bgcolor='rgba(17,24,39,0.6)',
+            font=dict(color="#94a3b8")
+        )
+        st.plotly_chart(fig_pie, use_container_width=True)
+    
+    # ── EXPANDABLE DETAILS ──
+    with st.expander("🔍 View Required Marks Details"):
+        st.dataframe(df[['Subject', 'Total %', 'Grade', 'Required Marks']], use_container_width=True)
+    
+    # ── EXPORT BUTTON ──
+    csv = df.to_csv(index=False).encode('utf-8')
+    st.download_button(
+        label="📥 Export Data (CSV)",
+        data=csv,
+        file_name=f"academic_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+        mime="text/csv",
+        use_container_width=True
+    )
 
     st.markdown("<div class='section-header'>📊 Performance Overview</div>", unsafe_allow_html=True)
 
