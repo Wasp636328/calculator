@@ -593,253 +593,146 @@ elif "Dashboard" in page:
 
     if not low_att.empty:
         for _, row in low_att.iterrows():
-            st.markdown(f"<div class='alert-warn'>⚠️ <b>{row['Subject']}</b> — Attendance {row['Attendance %']}% is below the 75% threshold.</div>", unsafe_allow_html=True)
+            st.markdown(f"<div class='alert-warn'>⚠️ <b>{row['Subject']}</b> — Attendance {row['Attendance %']}% (below 75%)</div>", unsafe_allow_html=True)
 
     if not failed_subs.empty:
         for _, row in failed_subs.iterrows():
-            st.markdown(f"<div class='alert-danger'>❌ <b>{row['Subject']}</b> — Failed (Grade F). Immediate attention required.</div>", unsafe_allow_html=True)
+            st.markdown(f"<div class='alert-danger'>❌ <b>{row['Subject']}</b> — Failed (Grade {row['Grade']})</div>", unsafe_allow_html=True)
 
-    if low_att.empty and failed_subs.empty:
-        st.markdown("<div class='alert-success'>✨ All subjects cleared with adequate attendance. Keep it up!</div>", unsafe_allow_html=True)
-
-    # Top subject
-    st.markdown(f"<div class='top-subject-badge'>🏆 Top Subject: {top_subject} — {top_score}%</div>", unsafe_allow_html=True)
+    # ── TOP SUBJECT HIGHLIGHT ──
+    st.markdown("<div class='section-header'>🏆 Best Performer</div>", unsafe_allow_html=True)
+    best = df.loc[df['Total %'].idxmax()]
+    st.markdown(f"""
+    <div class='top-subject-badge'>
+      🌟 {best['Subject']} – {best['Total %']}% (Grade {best['Grade']})
+    </div>
+    """, unsafe_allow_html=True)
 
     # ── SUBJECT TABLE ──
-    st.markdown("<div class='section-header'>📋 Subject-wise Breakdown</div>", unsafe_allow_html=True)
+    st.markdown("<div class='section-header'>📋 Subject-wise Performance</div>", unsafe_allow_html=True)
+    
+    # Display dataframe with styling
+    display_df = df[['Subject', 'Credits', 'Internal (/50)', 'External (/100)', 
+                     'Total %', 'Grade', 'Grade Point', 'Attendance %', 'Status']]
+    
+    # Apply custom styling
+    def color_grade(val):
+        if val == 'S': return 'color: #fbbf24; font-weight: bold'
+        elif val == 'A': return 'color: #34d399; font-weight: bold'
+        elif val == 'B': return 'color: #60a5fa; font-weight: bold'
+        elif val == 'C': return 'color: #a78bfa; font-weight: bold'
+        elif val == 'D': return 'color: #fb923c; font-weight: bold'
+        elif val == 'E': return 'color: #f87171; font-weight: bold'
+        elif val == 'F': return 'color: #ef4444; font-weight: bold'
+        return ''
+    
+    def color_attendance(val):
+        if val < 75:
+            return 'color: #ef4444; font-weight: bold'
+        return 'color: #34d399'
+    
+    styled_df = display_df.style.applymap(color_grade, subset=['Grade'])
+    styled_df = styled_df.applymap(color_attendance, subset=['Attendance %'])
+    
+    st.dataframe(styled_df, use_container_width=True, height=400)
 
-    display_df = df[[
-        "Subject", "Credits", "Internal (/50)", "External (/100)",
-        "Total %", "Grade", "Grade Point", "Attendance %", "Status", "Required Marks"
-    ]].copy()
-
-    # FIX: use .map() instead of deprecated .applymap()
-    st.dataframe(
-        display_df.style
-            .background_gradient(subset=["Total %"], cmap="Blues")
-            .background_gradient(subset=["Attendance %"], cmap="Greens")
-            .map(
-                lambda v: f"color: {GRADE_COLORS.get(v, '#f1f5f9')}; font-weight:700" if v in GRADE_COLORS else "",
-                subset=["Grade"]
-            )
-            .set_properties(**{"background-color": "#111827", "color": "#f1f5f9"}),
-        use_container_width=True,
-        height=300,
-    )
-
-    # ── CHARTS ──
+    # ── CHART SECTION ──
     st.markdown("<div class='section-header'>📈 Visual Analytics</div>", unsafe_allow_html=True)
-
-    ch1, ch2 = st.columns([1, 1])
-
-    # Bar — subject marks
-    with ch1:
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        # Bar chart - Performance by subject
         fig_bar = px.bar(
-            df, x="Subject", y="Total %",
-            color="Grade",
+            df, x='Subject', y='Total %',
+            color='Grade',
             color_discrete_map=GRADE_COLORS,
-            title="Subject-wise Total Marks (%)",
-            text="Total %",
+            title='Performance by Subject (%)',
+            text='Total %',
+            height=400
         )
-        fig_bar.update_traces(texttemplate="%{text:.1f}%", textposition="outside")
-        fig_bar.update_layout(**PLOTLY_THEME, title_font_size=14, showlegend=True, height=380)
-        fig_bar.add_hline(y=40, line_dash="dash", line_color="#ef4444", annotation_text="Pass Line (40%)")
+        fig_bar.update_traces(textposition='outside')
+        fig_bar.update_layout(**PLOTLY_THEME)
         st.plotly_chart(fig_bar, use_container_width=True)
-
-    # Pie — grade distribution
-    with ch2:
-        grade_counts = df["Grade"].value_counts().reset_index()
-        grade_counts.columns = ["Grade", "Count"]
-        fig_pie = px.pie(
-            grade_counts, names="Grade", values="Count",
-            color="Grade", color_discrete_map=GRADE_COLORS,
-            title="Grade Distribution",
-            hole=0.45,
-        )
-        fig_pie.update_layout(**PLOTLY_THEME, title_font_size=14, height=380)
-        fig_pie.update_traces(textinfo="percent+label", textfont_size=13)
-        st.plotly_chart(fig_pie, use_container_width=True)
-
-    # Attendance bar
-    fig_att = px.bar(
-        df, x="Subject", y="Attendance %",
-        color="Attendance %",
-        color_continuous_scale=[[0,"#ef4444"],[0.75,"#f59e0b"],[1,"#34d399"]],
-        title="Attendance % per Subject",
-        text="Attendance %",
+    
+    with col2:
+        # Attendance gauge
+        fig_gauge = go.Figure(go.Indicator(
+            mode="gauge+number",
+            value=att_pct,
+            title={'text': "Overall Attendance", 'font': {'color': '#94a3b8'}},
+            gauge={
+                'axis': {'range': [0, 100], 'tickcolor': '#94a3b8'},
+                'bar': {'color': '#4f9cf9'},
+                'steps': [
+                    {'range': [0, 75], 'color': 'rgba(239, 68, 68, 0.2)'},
+                    {'range': [75, 100], 'color': 'rgba(52, 211, 153, 0.2)'}
+                ],
+                'threshold': {
+                    'line': {'color': '#f59e0b', 'width': 4},
+                    'thickness': 0.75,
+                    'value': 75
+                }
+            },
+            number={'font': {'color': '#f1f5f9', 'size': 60}}
+        ))
+        fig_gauge.update_layout(height=400, paper_bgcolor='rgba(0,0,0,0)', font={'color': '#94a3b8'})
+        st.plotly_chart(fig_gauge, use_container_width=True)
+    
+    # Grade distribution pie chart
+    grade_dist = df['Grade'].value_counts().reset_index()
+    grade_dist.columns = ['Grade', 'Count']
+    fig_pie = px.pie(
+        grade_dist, values='Count', names='Grade',
+        title='Grade Distribution',
+        color='Grade',
+        color_discrete_map=GRADE_COLORS,
+        hole=0.3
     )
-    fig_att.update_traces(texttemplate="%{text}%", textposition="outside")
-    fig_att.add_hline(y=75, line_dash="dot", line_color="#f59e0b", annotation_text="75% Min Required")
-    fig_att.update_layout(**PLOTLY_THEME, title_font_size=14, coloraxis_showscale=False, height=350)
-    st.plotly_chart(fig_att, use_container_width=True)
+    fig_pie.update_layout(**PLOTLY_THEME, height=400)
+    st.plotly_chart(fig_pie, use_container_width=True)
 
-    # Radar — subject performance
-    radar_fig = go.Figure()
-    radar_fig.add_trace(go.Scatterpolar(
-        r=df["Total %"].tolist() + [df["Total %"].iloc[0]],
-        theta=df["Subject"].tolist() + [df["Subject"].iloc[0]],
-        fill="toself",
-        fillcolor="rgba(79,156,249,.15)",
-        line=dict(color="#4f9cf9", width=2),
-        name="Marks %"
-    ))
-    radar_fig.add_trace(go.Scatterpolar(
-        r=df["Attendance %"].tolist() + [df["Attendance %"].iloc[0]],
-        theta=df["Subject"].tolist() + [df["Subject"].iloc[0]],
-        fill="toself",
-        fillcolor="rgba(52,211,153,.1)",
-        line=dict(color="#34d399", width=2),
-        name="Attendance %"
-    ))
-    radar_fig.update_layout(
-        **PLOTLY_THEME,
-        polar=dict(
-            bgcolor="rgba(17,24,39,.6)",
-            radialaxis=dict(visible=True, range=[0, 100], color="#475569", gridcolor="#1f2d45"),
-            angularaxis=dict(color="#94a3b8", gridcolor="#1f2d45"),
-        ),
-        title=dict(text="Performance Radar", font_size=14, font_color="#94a3b8"),
-        showlegend=True,
-        height=450,
+    # ── EXPANDABLE DETAILS ──
+    with st.expander("🔍 View Required Marks Details"):
+        st.dataframe(df[['Subject', 'Total %', 'Grade', 'Required Marks']], use_container_width=True)
+    
+    # ── EXPORT BUTTON ──
+    csv = df.to_csv(index=False).encode('utf-8')
+    st.download_button(
+        label="📥 Export Data (CSV)",
+        data=csv,
+        file_name=f"academic_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+        mime="text/csv",
+        use_container_width=True
     )
-    st.plotly_chart(radar_fig, use_container_width=True)
-
-    # ── REQUIRED MARKS PREDICTOR ──
-    st.markdown("<div class='section-header'>🎯 Required Marks Predictor</div>", unsafe_allow_html=True)
-    pred_df = df[["Subject", "Total %", "Grade", "Required Marks"]].copy()
-    for _, row in pred_df.iterrows():
-        col_icon = "✅" if row["Grade"] not in ("F","E","D") else "⚠️"
-        grade_color = GRADE_COLORS.get(row["Grade"], "#94a3b8")
-        st.markdown(f"""
-        <div class='card' style='padding:.9rem 1.2rem;margin-bottom:.5rem'>
-          <span style='font-weight:600;color:#f1f5f9'>{col_icon} {row['Subject']}</span>
-          <span style='color:{grade_color};font-weight:700;margin-left:1rem'>Grade {row['Grade']}</span>
-          <span style='color:#475569;margin-left:.5rem'>({row['Total %']}%)</span>
-          <div style='color:#94a3b8;font-size:.85rem;margin-top:.3rem'>{row['Required Marks']}</div>
-        </div>
-        """, unsafe_allow_html=True)
-
-    # ── DOWNLOAD ──
-    st.markdown("<div class='section-header'>💾 Export Report</div>", unsafe_allow_html=True)
-    dl1, dl2, _ = st.columns([1.5, 1.5, 5])
-
-    with dl1:
-        csv_buf = io.StringIO()
-        df.to_csv(csv_buf, index=False)
-        st.download_button(
-            "⬇ Download CSV",
-            data=csv_buf.getvalue(),
-            file_name=f"cgpa_report_{datetime.now().strftime('%Y%m%d')}.csv",
-            mime="text/csv",
-        )
-    with dl2:
-        txt_lines = [
-            "STUDENT CGPA & ATTENDANCE REPORT",
-            f"Generated: {datetime.now().strftime('%d %B %Y %H:%M')}",
-            "=" * 50,
-            f"Overall CGPA      : {calc_cgpa(df)}",
-            f"Overall Attendance: {calc_overall_attendance(df)}%",
-            f"Total Credits     : {df['Credits'].sum()}",
-            f"Passed Subjects   : {(df['Grade']!='F').sum()}",
-            f"Failed Subjects   : {(df['Grade']=='F').sum()}",
-            "=" * 50,
-        ]
-        for _, row in df.iterrows():
-            txt_lines += [
-                f"\nSubject : {row['Subject']}",
-                f"  Credits     : {row['Credits']}",
-                f"  Internal    : {row['Internal (/50)']}/50",
-                f"  External    : {row['External (/100)']}/100",
-                f"  Total %     : {row['Total %']}",
-                f"  Grade       : {row['Grade']} (GP: {row['Grade Point']})",
-                f"  Attendance  : {row['Attendance %']}%",
-                f"  Status      : {row['Status']}",
-                f"  Predictor   : {row['Required Marks']}",
-            ]
-        st.download_button(
-            "⬇ Download TXT",
-            data="\n".join(txt_lines),
-            file_name=f"cgpa_report_{datetime.now().strftime('%Y%m%d')}.txt",
-            mime="text/plain",
-        )
-
-    # ── FUTURE SCOPE ──
-    st.markdown("<br>", unsafe_allow_html=True)
-    with st.expander("🚀 Future Scope & Roadmap", expanded=False):
-        col_a, col_b = st.columns(2)
-        with col_a:
-            st.markdown("""
-            **🔗 Integration & Sync**
-            - Integration with University ERP systems
-            - Automated timetable sync via LMS API
-            - Push notifications for low attendance
-
-            **📆 Planning Tools**
-            - AI-powered exam preparation planner
-            - Smart study scheduler with Pomodoro mode
-            """)
-        with col_b:
-            st.markdown("""
-            **📚 History & Analytics**
-            - Multi-semester CGPA history tracking
-            - Cumulative performance trend charts
-            - Peer percentile comparison (anonymized)
-
-            **🤖 AI Enhancements**
-            - Grade prediction using ML models
-            - Personalised improvement recommendations
-            """)
 
 
 # ═══════════════════════════════════════════════
 # PAGE: ABOUT
 # ═══════════════════════════════════════════════
-elif "About" in page:
-    st.markdown("<div class='section-header'>ℹ️ About This Project</div>", unsafe_allow_html=True)
-
+else:
     st.markdown("""
     <div class='card'>
-      <p style='font-size:1.05rem;line-height:1.8;color:#cbd5e1'>
-        <b style='color:#f1f5f9'>Student CGPA & Attendance Tracker</b> is a data-driven academic monitoring
-        tool that helps students stay on top of their performance in real time. It combines
-        <b>Education Management</b>, <b>Data Analysis</b>, and <b>Software Development</b>
-        to provide actionable insights at a glance.
+      <div style='font-family:"DM Serif Display",serif;font-size:1.6rem;margin-bottom:1rem'>
+        ℹ️ About This System
+      </div>
+      <p style='color:#94a3b8;font-size:1rem;line-height:1.5'>
+        The <strong>Student CGPA & Attendance Tracker</strong> is a comprehensive academic monitoring tool designed to help students:
       </p>
-    </div>
-    """, unsafe_allow_html=True)
-
-    st.markdown("""
-    <div class='section-header'>⚙️ Grading Scale Used</div>
-    """, unsafe_allow_html=True)
-
-    scale_data = {
-        "Marks Range": ["90 – 100", "80 – 89", "70 – 79", "60 – 69", "50 – 59", "40 – 49", "Below 40"],
-        "Grade":       ["S", "A", "B", "C", "D", "E", "F"],
-        "Grade Point": [10, 9, 8, 7, 6, 5, 0],
-        "Status":      ["Outstanding", "Excellent", "Very Good", "Good", "Average", "Marginal Pass", "Fail"],
-    }
-    st.dataframe(
-        pd.DataFrame(scale_data)
-          .style.set_properties(**{"background-color": "#111827", "color": "#f1f5f9"}),
-        use_container_width=True, hide_index=True,
-    )
-
-    st.markdown("""
-    <div class='section-header'>🧮 Calculation Method</div>
-    """, unsafe_allow_html=True)
-    st.markdown("""
-    <div class='card'>
-      <ul style='color:#94a3b8;line-height:2.2;font-size:.95rem'>
-        <li><b style='color:#f1f5f9'>Total %</b> = ((Internal/50)×50 + External) / 150 × 100</li>
-        <li><b style='color:#f1f5f9'>CGPA</b> = Σ(Grade Point × Credits) / Σ Credits</li>
-        <li><b style='color:#f1f5f9'>Attendance %</b> = (Classes Attended / Total Classes) × 100</li>
-        <li><b style='color:#f1f5f9'>Required External</b> = (Target% × 150/100) − Internal</li>
+      <ul style='color:#94a3b8;margin-top:.5rem;line-height:1.6'>
+        <li>📊 Calculate precise CGPA based on credit hours and grade points</li>
+        <li>📅 Track attendance percentages across all subjects</li>
+        <li>🎯 Get actionable insights on marks needed for grade improvement</li>
+        <li>📈 Visualize performance with interactive charts</li>
+        <li>💾 Export data for offline record keeping</li>
       </ul>
-    </div>
-    """, unsafe_allow_html=True)
-
-    st.markdown("""
-    <div style='text-align:center;color:#334155;font-size:.8rem;margin-top:3rem'>
-      Built with ❤️ using Streamlit · Python · Plotly
+      <hr>
+      <div style='font-size:.85rem;color:#475569;margin-top:1rem'>
+        <strong>Grading Scale (10-point system):</strong><br>
+        S (90-100) · A (80-89) · B (70-79) · C (60-69) · D (50-59) · E (40-49) · F (&lt;40)
+      </div>
+      <div style='font-size:.75rem;color:#334155;margin-top:1.5rem;text-align:center'>
+        Made with ❤️ for academic excellence
+      </div>
     </div>
     """, unsafe_allow_html=True)
