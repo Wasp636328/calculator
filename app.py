@@ -731,7 +731,7 @@ elif "Dashboard" in page:
     st.markdown("<div class='section-header'>📋 Subject-wise Performance</div>", unsafe_allow_html=True)
     
     # Display dataframe with styling - compatible with all pandas versions
-    display_df = df[['Subject', 'Credits', 'Internal (/50)', 'External (/100)', 
+    display_df = df[['Subject', 'Credits', 'Internal (/40)', 'External (/100)', 
                      'Total %', 'Grade', 'Grade Point', 'Attendance %', 'Status']]
     
     # Format numbers
